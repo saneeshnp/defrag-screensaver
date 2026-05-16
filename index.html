@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Defrag Screensaver</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Start screen -->
+  <section id="start-screen" class="screen active">
+    <div class="start-card">
+      <h1>DEFRAG SCREENSAVER</h1>
+      <p class="tagline">A loving recreation of the classic disk defragmenter.</p>
+
+      <label class="field">
+        <span>Operating system</span>
+        <select id="os-select">
+          <option value="msdos">MS-DOS 6.22</option>
+          <option value="win31">Windows 3.1</option>
+          <option value="win9x">Windows 95 / 98</option>
+          <option value="winxp">Windows XP</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Duration</span>
+        <select id="duration-select">
+          <option value="300" selected>5 minutes</option>
+          <option value="600">10 minutes</option>
+          <option value="1800">30 minutes</option>
+        </select>
+      </label>
+
+      <label class="field checkbox">
+        <input type="checkbox" id="sound-toggle" checked />
+        <span>Sound effects</span>
+      </label>
+
+      <label class="field checkbox">
+        <input type="checkbox" id="fullscreen-toggle" checked />
+        <span>Go fullscreen on start</span>
+      </label>
+
+      <button id="start-btn" type="button">START</button>
+
+      <p class="hint">Press <kbd>Esc</kbd> at any time to exit.</p>
+    </div>
+  </section>
+
+  <!-- Defrag screen -->
+  <section id="defrag-screen" class="screen">
+    <canvas id="defrag-canvas"></canvas>
+  </section>
+
+  <!-- Complete screen -->
+  <section id="complete-screen" class="screen">
+    <div class="complete-card">
+      <h2>OPTIMIZATION COMPLETE</h2>
+      <p id="complete-stats"></p>
+      <p>Would you like to run it again?</p>
+      <div class="complete-actions">
+        <button id="rerun-btn" type="button">RUN AGAIN</button>
+        <button id="back-btn" type="button">CHANGE SETTINGS</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
