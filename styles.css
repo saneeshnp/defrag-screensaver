@@ -40,7 +40,29 @@ html, body {
   background: linear-gradient(135deg, #0a0a23 0%, #1a1a3e 100%);
 }
 
+#github-link {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  color: var(--dos-white);
+  opacity: 0.6;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#github-link:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+#github-link svg {
+  display: block;
+}
+
 .start-card {
+  position: relative;
   width: min(480px, 92vw);
   background: var(--dos-blue);
   border: 3px double var(--dos-white);
@@ -164,8 +186,10 @@ kbd {
 
 /* ---------- Complete screen ---------- */
 
+/* Rendered as an overlay on top of the defrag canvas — the canvas keeps
+   showing the final consolidated state behind the popup. */
 #complete-screen {
-  background: var(--dos-blue);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .complete-card {

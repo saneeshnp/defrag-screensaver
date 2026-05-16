@@ -4,6 +4,50 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Defrag Screensaver</title>
+  <meta
+    name="description"
+    content="A tiny browser tribute to the old Microsoft Defrag screen. Pick an OS, hit Start, and relive the 90s."
+  />
+  <meta name="theme-color" content="#6a6dfe" />
+  <link rel="canonical" href="https://saneeshnp.github.io/defrag-screensaver/" />
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%BE%3C/text%3E%3C/svg%3E"
+  />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Defrag Screensaver" />
+  <meta property="og:title" content="Defrag Screensaver" />
+  <meta
+    property="og:description"
+    content="A tiny browser tribute to the old Microsoft Defrag screen. Pick an OS, hit Start, and relive the 90s."
+  />
+  <meta property="og:url" content="https://saneeshnp.github.io/defrag-screensaver/" />
+  <meta property="og:locale" content="en_US" />
+  <meta
+    property="og:image"
+    content="https://saneeshnp.github.io/defrag-screensaver/og-image.png"
+  />
+  <meta property="og:image:secure_url" content="https://saneeshnp.github.io/defrag-screensaver/og-image.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1536" />
+  <meta property="og:image:height" content="1024" />
+  <meta property="og:image:alt" content="Retro Defrag screen with cluster grid" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://saneeshnp.github.io/defrag-screensaver/" />
+  <meta name="twitter:title" content="Defrag Screensaver" />
+  <meta
+    name="twitter:description"
+    content="A tiny browser tribute to the old Microsoft Defrag screen."
+  />
+  <meta
+    name="twitter:image"
+    content="https://saneeshnp.github.io/defrag-screensaver/og-image.png"
+  />
+  <meta name="twitter:image:alt" content="Retro Defrag screen with cluster grid" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
@@ -13,6 +57,21 @@
   <!-- Start screen -->
   <section id="start-screen" class="screen active">
     <div class="start-card">
+      <a
+        id="github-link"
+        href="https://github.com/saneeshnp/defrag-screensaver"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="View source on GitHub"
+        title="View source on GitHub"
+      >
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.24 3.34.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"
+          />
+        </svg>
+      </a>
       <h1>DEFRAG SCREENSAVER</h1>
       <p class="tagline">A loving recreation of the classic disk defragmenter.</p>
 
@@ -20,6 +79,7 @@
         <span>Operating system</span>
         <select id="os-select">
           <option value="msdos">MS-DOS 6.22</option>
+          <option value="black">MS-DOS 6.22 but dark</option>
           <option value="win31">Windows 3.1</option>
           <option value="win9x">Windows 95 / 98</option>
           <option value="winxp">Windows XP</option>
@@ -29,14 +89,15 @@
       <label class="field">
         <span>Duration</span>
         <select id="duration-select">
-          <option value="300" selected>5 minutes</option>
+          <option value="300">5 minutes</option>
           <option value="600">10 minutes</option>
           <option value="1800">30 minutes</option>
+          <option value="0" selected>Until defrag completes</option>
         </select>
       </label>
 
       <label class="field checkbox">
-        <input type="checkbox" id="sound-toggle" checked />
+        <input type="checkbox" id="sound-toggle" />
         <span>Sound effects</span>
       </label>
 

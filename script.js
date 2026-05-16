@@ -19,6 +19,21 @@
       footerLabel: "Drive C:",
       gridStyle: "classic",
     },
+    black: {
+      name: "MS-DOS 6.22 but dark",
+      bg: "#000000",
+      bgDot: "#2a2a2a",
+      usedFill: "#ffffff",
+      usedDot: "#000000",
+      writing: "#ffff55",
+      reading: "#ffff55",
+      text: "#ffffff",
+      heading: "#ffff55",
+      border: "#ffffff",
+      title: "Microsoft Defrag",
+      footerLabel: "Drive C:",
+      gridStyle: "classic",
+    },
     win31: {
       name: "Windows 3.1",
       bg: "#0000a8",
@@ -520,7 +535,7 @@
       // Solid white block with a single dot in the center.
       ctx.fillStyle = theme.usedFill;
       ctx.fillRect(x, y, w, h);
-      const dotSize = Math.max(1, Math.floor(cellW * 0.2));
+      const dotSize = Math.max(2, Math.floor(cellW * 0.32));
       ctx.fillStyle = theme.usedDot;
       ctx.fillRect(
         x + Math.floor(w / 2) - Math.floor(dotSize / 2),
@@ -804,7 +819,13 @@
       if (!opInProgress) {
         const moved = performDefragStep(now);
         if (!moved) {
-          // Finished a pass. Refragment lightly and keep going until duration cap.
+          // Disk is fully consolidated.
+          if (durationSec === 0) {
+            // "Until complete" mode: actually finish.
+            finishRun();
+            return;
+          }
+          // Timer-bounded mode: keep the show going until the timer ends.
           refragmentLightly();
         }
       }
@@ -814,11 +835,10 @@
         xpLastStepTime = now;
         if (!moved) {
           if (durationSec === 0) {
-            refragmentLightly();
-          } else if (elapsedMs / 1000 >= durationSec * 0.95) {
             finishRun();
             return;
           }
+          refragmentLightly();
         }
       }
     }
@@ -912,12 +932,22 @@
 
   function finishRun() {
     stopRun();
+    // Snap the canvas to a clean final state under the overlay:
+    // commit any in-flight move and clear background flickers.
+    randomFlickers = [];
+    if (theme.gridStyle === "classic" && opInProgress) {
+      grid[opInProgress.from] = S.UNUSED;
+      grid[opInProgress.to] = S.USED;
+      opInProgress = null;
+    }
+    render();
     const pct = totalClusters > 0
       ? Math.min(100, Math.floor((processedClusters / totalClusters) * 100))
       : 100;
     completeStats.textContent =
       `${theme.name}  •  ${pct}% optimized  •  Elapsed ${formatTime(elapsedMs)}`;
-    showScreen(completeScreen);
+    // Show complete screen as an overlay — keep defrag screen visible behind it.
+    completeScreen.classList.add("active");
     beep(880, 60);
     setTimeout(() => beep(1320, 80), 70);
   }
