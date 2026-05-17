@@ -125,6 +125,7 @@
   let cellW = 0;
   let cellH = 0;
   let glyphFontSize = 16;
+  let hatchPattern = null; // CanvasPattern, rebuilt per theme
   let gridX = 0;
   let gridY = 0;
   let gridW = 0;
@@ -142,6 +143,7 @@
   let hddSource = null;
   let hddGain = null;
   let hddLoadPromise = null;
+  let hddShouldPlay = false; // intent flag — true between start/stop calls
 
   let rafId = 0;
   let stepIntervalMs = 350; // per-move duration (includes flashing)
@@ -191,6 +193,7 @@
   }
 
   function startHddLoop() {
+    hddShouldPlay = true;
     ensureAudio();
     if (!audioCtx) return;
     // Resume in case the context is suspended (autoplay policy)
@@ -198,8 +201,16 @@
       audioCtx.resume().catch(() => {});
     }
     loadHddBuffer().then((buffer) => {
-      if (!buffer || soundMode !== "hdd" || !running) return;
-      stopHddLoop();
+      // Re-check intent in case the user cancelled while we were decoding.
+      if (!buffer || !hddShouldPlay) return;
+      // Tear down any prior source before starting a fresh one.
+      if (hddSource) {
+        try {
+          hddSource.stop();
+          hddSource.disconnect();
+        } catch (e) {}
+        hddSource = null;
+      }
 
       if (!hddGain) {
         hddGain = audioCtx.createGain();
@@ -221,6 +232,7 @@
   }
 
   function stopHddLoop() {
+    hddShouldPlay = false;
     if (hddSource) {
       try {
         hddSource.stop();
@@ -549,15 +561,26 @@
     }
   }
 
+  // Build a tiny 2×6 tile that matches the old hand-drawn dot pattern, then
+  // expose it as a CanvasPattern so a single fillRect can paint the whole
+  // unused-cell texture (instead of ~150K individual 1px fillRects per frame).
+  function buildHatchPattern() {
+    const off = document.createElement("canvas");
+    off.width = 2;
+    off.height = 6;
+    const o = off.getContext("2d");
+    o.fillStyle = theme.bg;
+    o.fillRect(0, 0, 2, 6);
+    o.fillStyle = theme.bgDot;
+    o.fillRect(1, 0, 1, 1); // row 0: dot at x=1
+    o.fillRect(0, 3, 1, 1); // row 3: dot at x=0 (offset alternates)
+    hatchPattern = ctx.createPattern(off, "repeat");
+  }
+
   function drawHatchPattern(x, y, w, h) {
-    // Light dotted texture for unused space
-    ctx.fillStyle = theme.bgDot;
-    const step = 3;
-    for (let yy = y; yy < y + h; yy += step) {
-      for (let xx = x + ((yy / step) & 1 ? 0 : 1); xx < x + w; xx += 2) {
-        ctx.fillRect(xx, yy, 1, 1);
-      }
-    }
+    if (!hatchPattern) buildHatchPattern();
+    ctx.fillStyle = hatchPattern;
+    ctx.fillRect(x, y, w, h);
   }
 
   function drawCell(col, row, state) {
@@ -975,6 +998,7 @@
 
   async function startRun() {
     theme = THEMES[osSelect.value] || THEMES.msdos;
+    hatchPattern = null; // force rebuild with the new theme's colors
     durationSec = parseInt(durationSelect.value, 10) || 0;
     soundMode = soundSelect.value;
 
