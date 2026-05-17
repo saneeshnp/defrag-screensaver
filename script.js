@@ -106,7 +106,7 @@
 
   const osSelect = document.getElementById("os-select");
   const durationSelect = document.getElementById("duration-select");
-  const soundToggle = document.getElementById("sound-toggle");
+  const soundSelect = document.getElementById("sound-select");
   const fullscreenToggle = document.getElementById("fullscreen-toggle");
   const startBtn = document.getElementById("start-btn");
   const rerunBtn = document.getElementById("rerun-btn");
@@ -134,7 +134,14 @@
   let startTime = 0;
   let elapsedMs = 0;
   let durationSec = 0;
-  let soundOn = true;
+  let soundMode = "hdd"; // "hdd" | "8bit" | "none"
+
+  // Web Audio API based HDD loop — gives gap-free, sample-accurate looping
+  // that a plain <audio loop> can't because of MP3 padding + buffer-refill.
+  let hddAudioBuffer = null;
+  let hddSource = null;
+  let hddGain = null;
+  let hddLoadPromise = null;
 
   let rafId = 0;
   let stepIntervalMs = 350; // per-move duration (includes flashing)
@@ -167,8 +174,66 @@
     }
   }
 
-  function beep(freq, durationMs, volume = 0.04) {
-    if (!soundOn || !audioCtx) return;
+  function loadHddBuffer() {
+    if (hddAudioBuffer) return Promise.resolve(hddAudioBuffer);
+    if (hddLoadPromise) return hddLoadPromise;
+    ensureAudio();
+    if (!audioCtx) return Promise.resolve(null);
+    hddLoadPromise = fetch("hdd-defrag-audio.mp3")
+      .then((res) => res.arrayBuffer())
+      .then((buf) => audioCtx.decodeAudioData(buf))
+      .then((decoded) => {
+        hddAudioBuffer = decoded;
+        return decoded;
+      })
+      .catch(() => null);
+    return hddLoadPromise;
+  }
+
+  function startHddLoop() {
+    ensureAudio();
+    if (!audioCtx) return;
+    // Resume in case the context is suspended (autoplay policy)
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+    loadHddBuffer().then((buffer) => {
+      if (!buffer || soundMode !== "hdd" || !running) return;
+      stopHddLoop();
+
+      if (!hddGain) {
+        hddGain = audioCtx.createGain();
+        hddGain.gain.value = 0.7;
+        hddGain.connect(audioCtx.destination);
+      }
+
+      hddSource = audioCtx.createBufferSource();
+      hddSource.buffer = buffer;
+      hddSource.loop = true;
+      // Trim ~25ms off each end of the loop region to skip MP3 priming/padding
+      // silence and any silent tails. Keeps the loop seamless.
+      const pad = 0.025;
+      hddSource.loopStart = Math.min(pad, buffer.duration * 0.05);
+      hddSource.loopEnd = Math.max(buffer.duration - pad, buffer.duration * 0.95);
+      hddSource.connect(hddGain);
+      hddSource.start(0, hddSource.loopStart);
+    });
+  }
+
+  function stopHddLoop() {
+    if (hddSource) {
+      try {
+        hddSource.stop();
+        hddSource.disconnect();
+      } catch (e) {
+        /* may already be stopped */
+      }
+      hddSource = null;
+    }
+  }
+
+  function playTone(freq, durationMs, volume) {
+    if (!audioCtx) return;
     const t = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -180,6 +245,21 @@
     osc.connect(gain).connect(audioCtx.destination);
     osc.start(t);
     osc.stop(t + durationMs / 1000 + 0.02);
+  }
+
+  // 8-bit beeps during the defrag — only audible in "8bit" mode.
+  function beep(freq, durationMs, volume = 0.04) {
+    if (soundMode !== "8bit") return;
+    playTone(freq, durationMs, volume);
+  }
+
+  // Ending fanfare — plays in both "hdd" and "8bit" modes, silent in "none".
+  function playEndingBeep() {
+    if (soundMode === "none") return;
+    ensureAudio();
+    if (!audioCtx) return;
+    playTone(880, 60, 0.06);
+    setTimeout(() => playTone(1320, 80, 0.06), 70);
   }
 
   // -------------------- Screen routing --------------------
@@ -896,9 +976,11 @@
   async function startRun() {
     theme = THEMES[osSelect.value] || THEMES.msdos;
     durationSec = parseInt(durationSelect.value, 10) || 0;
-    soundOn = soundToggle.checked;
+    soundMode = soundSelect.value;
 
-    if (soundOn) ensureAudio();
+    if (soundMode !== "none") ensureAudio();
+    if (soundMode === "hdd") startHddLoop();
+    else stopHddLoop();
 
     showScreen(defragScreen);
 
@@ -928,6 +1010,7 @@
     running = false;
     if (rafId) cancelAnimationFrame(rafId);
     rafId = 0;
+    stopHddLoop();
   }
 
   function finishRun() {
@@ -948,8 +1031,7 @@
       `${theme.name}  •  ${pct}% optimized  •  Elapsed ${formatTime(elapsedMs)}`;
     // Show complete screen as an overlay — keep defrag screen visible behind it.
     completeScreen.classList.add("active");
-    beep(880, 60);
-    setTimeout(() => beep(1320, 80), 70);
+    playEndingBeep();
   }
 
   function exitToStart() {
@@ -1016,7 +1098,13 @@
       if (s.duration && [...durationSelect.options].some((o) => o.value === s.duration)) {
         durationSelect.value = s.duration;
       }
-      if (typeof s.sound === "boolean") soundToggle.checked = s.sound;
+      // soundMode (new) or sound (legacy boolean — true → 8bit beeps, false → none)
+      const validModes = ["hdd", "8bit", "none"];
+      if (s.soundMode && validModes.includes(s.soundMode)) {
+        soundSelect.value = s.soundMode;
+      } else if (typeof s.sound === "boolean") {
+        soundSelect.value = s.sound ? "8bit" : "none";
+      }
       if (typeof s.fullscreen === "boolean") fullscreenToggle.checked = s.fullscreen;
     } catch (e) {
       /* corrupted storage — ignore */
@@ -1030,7 +1118,7 @@
         JSON.stringify({
           os: osSelect.value,
           duration: durationSelect.value,
-          sound: soundToggle.checked,
+          soundMode: soundSelect.value,
           fullscreen: fullscreenToggle.checked,
         })
       );
@@ -1039,7 +1127,7 @@
     }
   }
 
-  [osSelect, durationSelect, soundToggle, fullscreenToggle].forEach((el) => {
+  [osSelect, durationSelect, soundSelect, fullscreenToggle].forEach((el) => {
     el.addEventListener("change", saveSettings);
   });
 

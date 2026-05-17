@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (in case anyone adds a static-server toolchain later)
+node_modules/
+npm-debug.log*

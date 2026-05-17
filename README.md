@@ -20,7 +20,13 @@ Visit [saneeshnp.github.io/defrag-screensaver](https://saneeshnp.github.io/defra
 - **Windows 95 / 98** for the era of beige towers and the startup chime.
 - **Windows XP** if you want the friendlier blue and red bar version that came later.
 
-Pick a duration (5, 10, 30 minutes, or run it until the disk is fully consolidated), toggle the PC speaker beeps, and decide if you want it to take over your whole screen. Press Escape to come back to reality.
+Pick a duration (5, 10, 30 minutes, or run it until the disk is fully consolidated), choose a sound mode, and decide if you want it to take over your whole screen. Press Escape to come back to reality.
+
+## Sound options
+
+- **IBM 90's hard disk** (default). Looped recording of an actual chunky 90s HDD doing its thing. Decoded with Web Audio API so the loop is genuinely seamless, no MP3 stutter at the join.
+- **8-bit beeps**. Squarewave PC speaker ticks on every move and flash. Synthesized via WebAudio.
+- **No sound**. Silent run, including the ending chime.
 
 ## How it pretends to work
 
@@ -38,12 +44,20 @@ Also because GitHub Pages is free and hosting a screensaver in 2026 is funny.
 
 ## Hosting it yourself
 
-The whole thing is static: `index.html`, `styles.css`, `script.js`, plus `og-image.png` for the social preview. Drop them on any static host. For GitHub Pages, push to a repo and enable Pages on the main branch. That's the whole deployment story.
+The whole thing is static: `index.html`, `styles.css`, `script.js`, `hdd-defrag-audio.mp3`, and `og-image.png` for the social preview. Drop them on any static host. For GitHub Pages, push to a repo and enable Pages on the main branch. That's the whole deployment story.
+
+Local note: because the HDD audio is fetched at runtime, opening `index.html` straight from disk hits a CORS block. Run a tiny static server in the project folder when developing locally:
+
+```bash
+python3 -m http.server 8000
+# or
+npx serve .
+```
 
 ## Notes
 
-- Sound effects are squarewave beeps via WebAudio. If they sound a bit harsh, that's on purpose.
+- The 8-bit beeps are squarewave tones via WebAudio. The HDD loop is a real recording decoded into an `AudioBufferSourceNode` with `loopStart`/`loopEnd` trimmed past the MP3 priming silence, so the loop is gap-free.
 - The fonts are VT323 from Google Fonts, the closest free thing to the old VGA text font.
-- All your settings (OS, duration, sound, fullscreen) get saved in localStorage so they stick around.
+- All your settings (OS, duration, sound mode, fullscreen) get saved in localStorage so they stick around.
 
 Now go watch some blocks move.
