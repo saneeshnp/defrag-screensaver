@@ -107,6 +107,7 @@
   const osSelect = document.getElementById("os-select");
   const durationSelect = document.getElementById("duration-select");
   const soundSelect = document.getElementById("sound-select");
+  const speedSlider = document.getElementById("speed-slider");
   const fullscreenToggle = document.getElementById("fullscreen-toggle");
   const startBtn = document.getElementById("start-btn");
   const rerunBtn = document.getElementById("rerun-btn");
@@ -315,8 +316,9 @@
     }
 
     // Classic cluster grid layout
-    // Reserve bottom area for status + legend boxes
-    const statusHeight = Math.min(160, Math.max(110, h * 0.18));
+    // Reserve bottom area for status + legend boxes. Min height bumped so the
+    // legend has comfortable room at high browser-zoom levels (smaller viewport).
+    const statusHeight = Math.min(170, Math.max(150, h * 0.2));
     const margin = Math.min(40, w * 0.025);
 
     gridX = margin;
@@ -394,9 +396,11 @@
     currentCluster = 0;
     opInProgress = null;
 
-    // Uniform pace, independent of selected duration. Each move takes this
-    // long including its r/W flashing.
-    stepIntervalMs = 550;
+    // Uniform pace, independent of selected duration. Scale by the speed
+    // slider: 0=slow (3.5x), 1=medium (1x), 2=fast (0.5x).
+    const speedIdx = parseInt(speedSlider.value, 10);
+    const factor = speedIdx === 0 ? 3.5 : speedIdx === 2 ? 0.5 : 1;
+    stepIntervalMs = Math.round(550 * factor);
   }
 
   // -------------------- Defrag step --------------------
@@ -435,10 +439,14 @@
 
     const thisStepMs = isSlowMove ? stepIntervalMs * 2 : stepIntervalMs;
 
-    // Flash cycles scale with the move duration
-    const flashCycles =
-      thisStepMs < 220 ? 2 : thisStepMs < 420 ? 3 : thisStepMs < 750 ? 4 : 6;
-    const totalPhases = flashCycles * 2;
+    // Keep per-phase blink time roughly constant across speed settings so the
+    // blink *rate* doesn't change — just fit more or fewer phases into the
+    // current move window.
+    const targetPhaseMs = 65;
+    const totalPhases = Math.max(
+      2,
+      Math.round((thisStepMs * 0.85) / targetPhaseMs)
+    );
 
     opInProgress = {
       from: move.from,
@@ -722,31 +730,67 @@
     sy += fontSize + 4;
     ctx.fillText("Full Optimization", sx, sy);
 
-    // Legend content
-    const lx = legendX + 16;
-    let ly = boxY + 26;
-    const colGap = Math.floor(legendW / 2);
-    const itemFont = Math.max(16, Math.min(22, Math.floor(boxH * 0.14)));
-    const rowGap = itemFont + 10;
+    // Legend content — pick a sensible readable font, then prefer 1-column
+    // over shrinking when widths don't allow 2 columns. We never go below 14px
+    // so the legend stays readable at high zoom even if it slightly overflows.
+    const labels = [
+      ["Used", S.USED],
+      ["Unused", S.UNUSED],
+      ["Reading", S.READING],
+      ["Writing", S.WRITING],
+      ["Bad", S.BAD],
+      ["Unmovable", S.UNMOVABLE],
+    ];
+    const innerPad = 16;
+    const innerW = legendW - innerPad * 2;
+    const lx = legendX + innerPad;
 
-    drawLegendItem(lx, ly, "Used", S.USED, itemFont);
-    drawLegendItem(lx + colGap, ly, "Unused", S.UNUSED, itemFont);
-    ly += rowGap;
-    drawLegendItem(lx, ly, "Reading", S.READING, itemFont);
-    drawLegendItem(lx + colGap, ly, "Writing", S.WRITING, itemFont);
-    ly += rowGap;
-    drawLegendItem(lx, ly, "Bad", S.BAD, itemFont);
-    drawLegendItem(lx + colGap, ly, "Unmovable", S.UNMOVABLE, itemFont);
-    ly += rowGap + 4;
+    const itemFont = Math.max(14, Math.min(22, Math.floor(boxH * 0.13)));
+    ctx.font = `${itemFont}px VT323, monospace`;
+    const sampleW = Math.round(itemFont * 1.1 * 0.72);
+    let widest = 0;
+    for (const [label] of labels) {
+      widest = Math.max(widest, ctx.measureText(`- ${label}`).width);
+    }
+    const itemW = sampleW + 10 + widest;
+    const twoColsFit = itemW * 2 + 20 <= innerW;
+    const columns = twoColsFit ? 2 : 1;
+
+    const rowGap = itemFont + 10;
+    const colGap = columns === 2 ? Math.floor(innerW / 2) : 0;
+    let ly = boxY + 26;
+
+    if (columns === 2) {
+      for (let i = 0; i < labels.length; i += 2) {
+        drawLegendItem(lx, ly, labels[i][0], labels[i][1], itemFont);
+        if (labels[i + 1]) {
+          drawLegendItem(lx + colGap, ly, labels[i + 1][0], labels[i + 1][1], itemFont);
+        }
+        ly += rowGap;
+      }
+    } else {
+      for (const [label, state] of labels) {
+        drawLegendItem(lx, ly, label, state, itemFont);
+        ly += rowGap;
+      }
+    }
+
+    ly += 4;
     ctx.fillStyle = theme.text;
     ctx.font = `${itemFont}px VT323, monospace`;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(
-      `${theme.footerLabel}   1 block = ${Math.max(8, Math.round(totalClusters / Math.max(cols, 1)))} clusters`,
-      lx,
-      ly
-    );
+    // Footer line — shorten cluster string if it would overflow innerW.
+    const fullFooter = `${theme.footerLabel}   1 block = ${Math.max(
+      8,
+      Math.round(totalClusters / Math.max(cols, 1))
+    )} clusters`;
+    const shortFooter = `${theme.footerLabel}  ${Math.max(
+      8,
+      Math.round(totalClusters / Math.max(cols, 1))
+    )}/blk`;
+    const useShort = ctx.measureText(fullFooter).width > innerW;
+    ctx.fillText(useShort ? shortFooter : fullFooter, lx, ly);
   }
 
   function drawLegendItem(x, y, label, state, fontPx) {
@@ -1129,6 +1173,7 @@
       } else if (typeof s.sound === "boolean") {
         soundSelect.value = s.sound ? "8bit" : "none";
       }
+      if (["0", "1", "2"].includes(s.speed)) speedSlider.value = s.speed;
       if (typeof s.fullscreen === "boolean") fullscreenToggle.checked = s.fullscreen;
     } catch (e) {
       /* corrupted storage — ignore */
@@ -1143,6 +1188,7 @@
           os: osSelect.value,
           duration: durationSelect.value,
           soundMode: soundSelect.value,
+          speed: speedSlider.value,
           fullscreen: fullscreenToggle.checked,
         })
       );
@@ -1151,7 +1197,7 @@
     }
   }
 
-  [osSelect, durationSelect, soundSelect, fullscreenToggle].forEach((el) => {
+  [osSelect, durationSelect, soundSelect, speedSlider, fullscreenToggle].forEach((el) => {
     el.addEventListener("change", saveSettings);
   });
 
