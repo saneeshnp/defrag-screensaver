@@ -219,11 +219,28 @@ kbd {
   font-family: var(--font-dos);
 }
 
+.report-issue {
+  text-align: center;
+  margin: 10px 0 0;
+  font-size: 16px;
+  color: var(--dos-white);
+}
+
+.report-issue a {
+  color: var(--dos-yellow);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.report-issue a:hover {
+  border-bottom-color: var(--dos-yellow);
+}
+
 /* ---------- Defrag screen ---------- */
 
 #defrag-screen {
   background: var(--dos-blue);
-  cursor: none;
 }
 
 #defrag-canvas {

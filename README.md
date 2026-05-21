@@ -28,6 +28,56 @@ Pick a duration (5, 10, 30 minutes, or run it until the disk is fully consolidat
 - **8-bit beeps**. Squarewave PC speaker ticks on every move and flash. Synthesized via WebAudio.
 - **No sound**. Silent run, including the ending chime.
 
+Note: browsers block audio until the user interacts with the page. If you arrive via a direct URL, sound will kick in the moment you press a key or click anywhere on the screen.
+
+## URL parameters
+
+You can skip the start screen entirely by adding parameters to the URL. The defrag begins straight away with whatever settings you pass.
+
+**Jump straight in with sensible defaults:**
+
+```
+https://saneeshnp.github.io/defrag-screensaver/?default
+```
+
+`?default` uses these values and ignores any other params in the URL:
+
+| Setting | Default value |
+|---|---|
+| OS | MS-DOS 6.22 |
+| Duration | Until defrag completes |
+| Speed | Medium |
+| Sound | No sound |
+| Fullscreen | Off |
+
+**Or dial in exactly what you want:**
+
+```
+https://saneeshnp.github.io/defrag-screensaver/?os=msdos&duration=0&speed=1&sound=hdd&fullscreen=false
+```
+
+Any param you leave out falls back to whatever is saved in your localStorage (or the form default if nothing is stored). Fullscreen is always skipped on direct URL visits regardless of what you pass, since the browser won't allow it without a user gesture.
+
+### Parameter reference
+
+| Param | Values | What it does |
+|---|---|---|
+| `os` | `msdos` `black` `win31` `win9x` `winxp` | Which OS skin to use |
+| `duration` | `300` `600` `1800` `0` | Run time in seconds. `0` means until the disk is fully consolidated |
+| `speed` | `0` `1` `2` | Defrag speed. 0 = slow, 1 = medium, 2 = fast |
+| `sound` | `hdd` `8bit` `none` | Sound mode |
+| `fullscreen` | `true` `false` | Request fullscreen on start (requires a prior user gesture, so has no effect on direct URL visits) |
+
+### Example links
+
+| What you get | URL |
+|---|---|
+| Pure defaults, straight in | [`?default`](https://saneeshnp.github.io/defrag-screensaver/?default) |
+| Windows 95, fast, HDD sound, 30 min | [`?os=win9x&duration=1800&speed=2&sound=hdd`](https://saneeshnp.github.io/defrag-screensaver/?os=win9x&duration=1800&speed=2&sound=hdd) |
+| Windows XP, slow, no sound | [`?os=winxp&duration=0&speed=0&sound=none`](https://saneeshnp.github.io/defrag-screensaver/?os=winxp&duration=0&speed=0&sound=none) |
+| Dark DOS, 8-bit beeps, fast | [`?os=black&duration=0&speed=2&sound=8bit`](https://saneeshnp.github.io/defrag-screensaver/?os=black&duration=0&speed=2&sound=8bit) |
+| Windows 3.1, medium, HDD sound | [`?os=win31&duration=0&speed=1&sound=hdd`](https://saneeshnp.github.io/defrag-screensaver/?os=win31&duration=0&speed=1&sound=hdd) |
+
 ## How it pretends to work
 
 A grid of clusters gets randomly scattered. One slot at the top picks a random used block from somewhere else on the disk, flashes `r` and `W` a few times like it's reading and writing, then settles into place. Occasionally a move takes a little longer, like it hit a stubborn file. Scattered cells flicker in the background, just for fun.

@@ -193,6 +193,21 @@
     return hddLoadPromise;
   }
 
+  // One-time handler: resumes a suspended AudioContext on the first user
+  // interaction. Needed when the defrag auto-starts from URL params — the
+  // browser won't allow AudioContext.resume() until the user touches the page.
+  function scheduleAudioResumeOnInteraction() {
+    const tryResume = () => {
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
+      document.removeEventListener("click",   tryResume, true);
+      document.removeEventListener("keydown", tryResume, true);
+    };
+    document.addEventListener("click",   tryResume, true);
+    document.addEventListener("keydown", tryResume, true);
+  }
+
   function startHddLoop() {
     hddShouldPlay = true;
     ensureAudio();
@@ -229,6 +244,14 @@
       hddSource.loopEnd = Math.max(buffer.duration - pad, buffer.duration * 0.95);
       hddSource.connect(hddGain);
       hddSource.start(0, hddSource.loopStart);
+
+      // If the context is still suspended after starting the source (i.e. we
+      // auto-started without a user gesture), wait for the first interaction
+      // to unblock it — the source node will begin playing as soon as the
+      // context resumes since no context time has advanced while suspended.
+      if (audioCtx.state === "suspended") {
+        scheduleAudioResumeOnInteraction();
+      }
     });
   }
 
@@ -1153,6 +1176,149 @@
     }
   });
 
+  // -------------------- URL parameters --------------------
+
+  // Hard-coded values used when ?default is present in the URL.
+  const URL_DEFAULTS = {
+    os:         "msdos",
+    duration:   "0",     // until defrag completes
+    speed:      "1",     // medium
+    sound:      "none",  // safe — browsers block audio without a prior user gesture
+    fullscreen: false,
+  };
+
+  const VALID_OS_VALUES       = Object.keys(THEMES);
+  const VALID_DURATION_VALUES = ["300", "600", "1800", "0"];
+  const VALID_SPEED_VALUES    = ["0", "1", "2"];
+  const VALID_SOUND_VALUES    = ["hdd", "8bit", "none"];
+
+  // Returns the current values of all form controls as a plain object.
+  function getCurrentFormSettings() {
+    return {
+      os:         osSelect.value,
+      duration:   durationSelect.value,
+      speed:      speedSlider.value,
+      sound:      soundSelect.value,
+      fullscreen: fullscreenToggle.checked,
+    };
+  }
+
+  // Pure resolver — decoupled from the DOM so it can be tested in isolation.
+  // Takes a URLSearchParams-compatible string and a fallback settings object.
+  // Returns resolved settings, or null if there are no params at all
+  // (null = normal start-screen flow, no auto-start).
+  function resolveUrlSettings(paramString, fallback) {
+    const params = new URLSearchParams(paramString);
+    if (![...params.keys()].length) return null;
+
+    // ?default present → use hard-coded defaults, ignore all other params.
+    if (params.has("default")) return { ...URL_DEFAULTS };
+
+    // Individual params — validate each; fall back to the current form value
+    // for anything missing or invalid so localStorage prefs are respected.
+    const os = VALID_OS_VALUES.includes(params.get("os"))
+      ? params.get("os") : fallback.os;
+    const duration = VALID_DURATION_VALUES.includes(params.get("duration"))
+      ? params.get("duration") : fallback.duration;
+    const speed = VALID_SPEED_VALUES.includes(params.get("speed"))
+      ? params.get("speed") : fallback.speed;
+    const sound = VALID_SOUND_VALUES.includes(params.get("sound"))
+      ? params.get("sound") : fallback.sound;
+    const fullscreen = params.has("fullscreen")
+      ? params.get("fullscreen") === "true"
+      : fallback.fullscreen;
+
+    return { os, duration, speed, sound, fullscreen };
+  }
+
+  // Applies resolved URL settings to the form controls.
+  // Returns true if any URL params were present (caller uses this to auto-start).
+  // Does NOT call saveSettings() — URL params shouldn't silently overwrite the
+  // user's stored preferences.
+  function applyUrlParams() {
+    const resolved = resolveUrlSettings(
+      window.location.search,
+      getCurrentFormSettings()
+    );
+    if (!resolved) return false;
+
+    osSelect.value           = resolved.os;
+    durationSelect.value     = resolved.duration;
+    speedSlider.value        = resolved.speed;
+    soundSelect.value        = resolved.sound;
+    fullscreenToggle.checked = resolved.fullscreen;
+    return true;
+  }
+
+  // -------------------- URL parameter tests --------------------
+  // Runs synchronously at page load; results appear in the browser console.
+  // Uses resolveUrlSettings() directly so the DOM is never touched.
+
+  function runUrlParamTests() {
+    // Simulate a stored state different from defaults so fallback paths are visible.
+    const stored = { os: "win9x", duration: "600", speed: "0", sound: "hdd", fullscreen: true };
+    const def    = { ...URL_DEFAULTS };
+
+    const cases = [
+      ["No params → null (normal flow)",
+        "", null],
+      ["?default → full defaults",
+        "?default", def],
+      ["?default&os=winxp → extra param ignored, still defaults",
+        "?default&os=winxp", def],
+      ["?os=winxp → only os overridden, rest from fallback",
+        "?os=winxp", { ...stored, os: "winxp" }],
+      ["?os=invalid → bad value falls back to stored os",
+        "?os=invalid", { ...stored }],
+      ["?speed=2 → only speed overridden",
+        "?speed=2", { ...stored, speed: "2" }],
+      ["?duration=1800&sound=8bit → two params overridden",
+        "?duration=1800&sound=8bit", { ...stored, duration: "1800", sound: "8bit" }],
+      ["?fullscreen=false → fullscreen set to false",
+        "?fullscreen=false", { ...stored, fullscreen: false }],
+      ["?fullscreen=true → fullscreen remains true",
+        "?fullscreen=true", { ...stored, fullscreen: true }],
+      ["?sound=invalid → bad value falls back to stored sound",
+        "?sound=invalid", { ...stored }],
+      ["All valid params → everything overridden",
+        "?os=winxp&speed=2&sound=none&duration=0&fullscreen=false",
+        { os: "winxp", speed: "2", sound: "none", duration: "0", fullscreen: false }],
+    ];
+
+    // Sort keys before stringifying so comparison is order-independent.
+    const norm = (v) =>
+      v === null ? "null" : JSON.stringify(
+        Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      );
+
+    let passed = 0;
+    let failed = 0;
+    console.groupCollapsed("Defrag screensaver — URL param tests");
+
+    for (const [desc, paramStr, expected] of cases) {
+      const result = resolveUrlSettings(paramStr, stored);
+      const ok = norm(result) === norm(expected);
+      if (ok) {
+        passed++;
+        console.log(`  ✓ ${desc}`);
+      } else {
+        failed++;
+        console.error(`  ✗ ${desc}`);
+        console.error(`    Expected: ${JSON.stringify(expected)}`);
+        console.error(`    Got:      ${JSON.stringify(result)}`);
+      }
+    }
+
+    const summary = `${passed}/${cases.length} passed`;
+    if (failed === 0) {
+      console.log(`%c✓ All URL param tests passed (${summary})`, "color:#4caf50;font-weight:bold");
+    } else {
+      console.error(`✗ URL param tests: ${summary} — ${failed} FAILED`);
+    }
+    console.groupEnd();
+    return failed === 0;
+  }
+
   // -------------------- Settings persistence --------------------
 
   const STORAGE_KEY = "defrag-screensaver-settings";
@@ -1203,7 +1369,14 @@
 
   loadSettings();
 
-  // Initial sizing
+  // Run tests first — purely diagnostic, no side effects on the DOM.
+  runUrlParamTests();
+
+  // If URL params are present, override the form and skip the start screen.
+  const urlAutoStart = applyUrlParams();
+
+  // Initial sizing (also called inside startRun, but needed here for the
+  // start screen canvas and for the font-ready handler below).
   resizeCanvas();
 
   // Re-measure glyph fit once the custom font loads so the r/W fit perfectly.
@@ -1211,5 +1384,13 @@
     document.fonts.ready.then(() => {
       if (running) layoutGrid();
     });
+  }
+
+  // Kick off immediately when URL params are present — bypass the start screen.
+  // Fullscreen requires a user gesture so it can never work here; force it off
+  // to avoid a noisy (though harmless) console warning.
+  if (urlAutoStart) {
+    fullscreenToggle.checked = false;
+    startRun();
   }
 })();
